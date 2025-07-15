@@ -15,127 +15,125 @@ const colors = {
   npc: "#d9a066"
 };
 
-function randomCoords(x, y, gridWidth, gridHeight) {
+function randomCoords() {
   return {
-    x: (typeof x === "number") ? x : Math.floor(Math.random() * gridWidth),
-    y: (typeof y === "number") ? y : Math.floor(Math.random() * gridHeight)
+    x: Math.floor(Math.random() * GRID_WIDTH),
+    y: Math.floor(Math.random() * GRID_HEIGHT)
   };
 }
 
-//CLASSES
 class Resource {
-  constructor(x, y, type, color) {
-  const coords = randomCoords(x, y, gridWidth, gridHeight);
-    this.x = coords.x;
-    this.y = coords.y;
+  constructor(type = "wood") {
+    const {x, y} = randomCoords();
+    this.x = x;
+    this.y = y;
     this.type = type;
-    this.color = color;
-    this.alive = true;
+    this.chopped = false;
   }
 
   draw() {
-    if (this.alive) {
-      drawTile(this.x, this.y, this.color);
+    if (!this.chopped) {
+      drawTile(this.x, this.y, colors.tree);
     }
   }
 }
 
+class Storage {
+  constructor() {
+    const {x, y} = randomCoords();
+    this.x = x;
+    this.y = y;
+    this.stored = 0;
+  }
+
+  draw() {
+    drawTile(this.x, this.y, colors.storage);
+    drawText(`Logs: ${this.stored}`, this.x * TILE_SIZE, this.y * TILE_SIZE - 10);
+  }
+}
 
 class NPC {
-  constructor(type, x, y) {
-    const coords = randomCoords(x, y, gridWidth, gridHeight);
-    this.x = coords.x;
-    this.y = coords.y;
-    this.type = type;
+  constructor(storage, resources) {
+    // Start NPC near storage
+    this.x = storage.x;
+    this.y = storage.y;
     this.state = "walking";
     this.inventory = 0;
-    this.target = findNearestResource(this);
-    this.workTimer = 0;
+    this.choppingTimer = 0;
+    this.storage = storage;
+    this.resources = resources;
+    this.target = this.findNearestResource();
   }
-  moveToward(target, speed) {
-    if (!target) return;
+
+  findNearestResource() {
+    // Just return first unchopped resource for now
+    return this.resources.find(r => !r.chopped);
+  }
+
+  moveToward(target) {
+    const speed = 0.02;
     if (this.x < target.x) this.x += speed;
     else if (this.x > target.x) this.x -= speed;
     if (this.y < target.y) this.y += speed;
     else if (this.y > target.y) this.y -= speed;
   }
-}
-class Storage {
-  constructor(x, y, type = "wood", color = "#5c4b3b") {
-    const coords = randomCoords(x, y, gridWidth, gridHeight);
-    this.x = coords.x;
-    this.y = coords.y;
-    this.type = type;
-    this.color = color;
-    this.stored = 0;
-  }
-}
-// === Time ===
-let time = 0;
 
-// === Functions ===
-function randomTree() {
-  return {
-    x: Math.floor(Math.random() * GRID_WIDTH),
-    y: Math.floor(Math.random() * GRID_HEIGHT),
-    chopped: false
-  };
-}
-
-function update() {
-  if (npc.state === "walking") {
-    moveToward(npc, npc.target);
-
-    if (reached(npc, tree) && !tree.chopped && npc.inventory === 0) {
-      npc.state = "chopping";
-      drawText("🪓",     npc.x * TILE_SIZE + TILE_SIZE / 4,
-    npc.y * TILE_SIZE - 8);
-      npc.choppingTimer = 2; // seconds
-    }
-
-    if (reached(npc, storage) && npc.inventory === 1) {
-      npc.state = "storing";
-    }
-
-  } else if (npc.state === "chopping") {
-    npc.choppingTimer -= 1 / 60; // approx. 60 FPS
-
-    if (npc.choppingTimer <= 0) {
-      tree.chopped = true;
-      npc.inventory = 1;
-      npc.state = "carrying";
-      npc.target = { x: storage.x, y: storage.y };
-    }
-
-  } else if (npc.state === "carrying") {
-    npc.state = "walking";
-
-  } else if (npc.state === "storing") {
-    npc.inventory = 0;
-    storage.stored += 1;
-
-    // Spawn a new tree
-    tree = randomTree();
-    npc.target = { x: tree.x, y: tree.y };
-    npc.state = "walking";
+  reached(target) {
+    return Math.abs(this.x - target.x) < 0.05 && Math.abs(this.y - target.y) < 0.05;
   }
 
-  time += 0.01;
+  update() {
+    switch(this.state) {
+      case "walking":
+        if (!this.target) {
+          this.target = this.findNearestResource();
+          if (!this.target) {
+            // No resource left, do nothing
+            return;
+          }
+        }
+
+        this.moveToward(this.target);
+
+        if (this.target instanceof Resource && !this.target.chopped && this.inventory === 0 && this.reached(this.target)) {
+          this.state = "chopping";
+          this.choppingTimer = 2; // seconds
+        } else if (this.target === this.storage && this.inventory === 1 && this.reached(this.storage)) {
+          this.state = "storing";
+        }
+        break;
+
+      case "chopping":
+        this.choppingTimer -= 1 / 60;
+        if (this.choppingTimer <= 0) {
+          this.target.chopped = true;
+          this.inventory = 1;
+          this.target = this.storage;
+          this.state = "walking";
+        }
+        break;
+
+      case "storing":
+        this.inventory = 0;
+        this.storage.stored += 1;
+        this.target = this.findNearestResource();
+        this.state = "walking";
+        break;
+    }
+  }
+
+  draw() {
+    drawTile(Math.floor(this.x), Math.floor(this.y), colors.npc);
+    if (this.inventory > 0) {
+      drawText("🪵", Math.floor(this.x) * TILE_SIZE + 16, Math.floor(this.y) * TILE_SIZE + 40);
+    }
+    if (this.state === "chopping") {
+      drawText("🪓", Math.floor(this.x) * TILE_SIZE + TILE_SIZE / 4, Math.floor(this.y) * TILE_SIZE - 8);
+    }
+  }
 }
 
-
-function moveToward(entity, target) {
-  const speed = 0.02;//const speed = 0.02;
-  if (entity.x < target.x) entity.x += speed;
-  else if (entity.x > target.x) entity.x -= speed;
-  if (entity.y < target.y) entity.y += speed;
-  else if (entity.y > target.y) entity.y -= speed;
-}
-
-function reached(a, b) {
-  return Math.abs(a.x - b.x) < 0.05 && Math.abs(a.y - b.y) < 0.05;
-}
-
+// Drawing helpers
 function drawTile(x, y, color) {
   ctx.fillStyle = color;
   ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
@@ -145,6 +143,18 @@ function drawText(text, x, y) {
   ctx.fillStyle = "white";
   ctx.font = "20px Arial";
   ctx.fillText(text, x, y);
+}
+
+// Setup
+const resources = [new Resource()];
+const storage = new Storage();
+const npc = new NPC(storage, resources);
+
+let time = 0;
+
+function update() {
+  npc.update();
+  time += 0.01;
 }
 
 function draw() {
@@ -159,23 +169,10 @@ function draw() {
     }
   }
 
-  if (!tree.chopped) drawTile(tree.x, tree.y, colors.tree);
-
-  drawTile(storage.x, storage.y, colors.storage);
-  drawText("Logs: " + storage.stored, storage.x * TILE_SIZE, storage.y * TILE_SIZE - 10);
-
-  drawTile(npc.x, npc.y, colors.npc);
-  if (npc.inventory > 0) {
-    drawText("🪵", npc.x * TILE_SIZE + 16, npc.y * TILE_SIZE + 40);
-  }
+  resources.forEach(r => r.draw());
+  storage.draw();
+  npc.draw();
 }
-
-//SETUP+LOOP
-
-const resources = [];
-resources.push(new Resource(1, 2, "wood", "#3b5e2b"));
-resources.push(new Resource(4, 5, "stone", "#888888"));
-resources.push(new Resource(6, 3, "strawberry", "#f4071bff"));
 
 function loop() {
   update();
