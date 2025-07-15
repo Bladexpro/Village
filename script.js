@@ -19,15 +19,43 @@ const colors = {
 let tree = randomTree();
 let storage = { x: 1, y: 6, stored: 0 };
 
-let npc = {
-  x: 1,
-  y: 1,
-  state: "walking",
-  target: { x: tree.x, y: tree.y },
-  inventory: 0,
-  choppingTimer: 0
-};
+//CLASSES
+class Resource {
+  constructor(x, y, type, color) {
+    this.x = x;
+    this.y = y;
+    this.type = type;
+    this.color = color;
+    this.alive = true;
+  }
 
+  draw() {
+    if (this.alive) {
+      drawTile(this.x, this.y, this.color);
+    }
+  }
+}
+
+
+class NPC {
+  constructor(type, x, y) {
+    this.type = type;
+    this.x = (typeof x === "number") ? x : Math.floor(Math.random() * gridWidth);
+    this.y = (typeof y === "number") ? y : Math.floor(Math.random() * gridHeight);
+    
+    this.state = "walking";
+    this.inventory = 0;
+    this.target = findNearestResource(this);
+    this.workTimer = 0;
+  }
+  moveToward(target, speed) {
+    if (!target) return;
+    if (this.x < target.x) this.x += speed;
+    else if (this.x > target.x) this.x -= speed;
+    if (this.y < target.y) this.y += speed;
+    else if (this.y > target.y) this.y -= speed;
+  }
+}
 
 // === Time ===
 let time = 0;
@@ -128,6 +156,13 @@ function draw() {
     drawText("🪵", npc.x * TILE_SIZE + 16, npc.y * TILE_SIZE + 40);
   }
 }
+
+//SETUP+LOOP
+
+const resources = [];
+resources.push(new Resource(1, 2, "wood", "#3b5e2b"));
+resources.push(new Resource(4, 5, "stone", "#888888"));
+resources.push(new Resource(6, 3, "strawberry", "#f4071bff"));
 
 function loop() {
   update();
