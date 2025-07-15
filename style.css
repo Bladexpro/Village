@@ -1,7 +1,7 @@
 body {
   margin: 0;
   overflow: hidden;
-  background: rgb(183, 24, 24);
+  background: rgb(0, 0, 0);
 }
 canvas {
   display: block;
