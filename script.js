@@ -15,15 +15,19 @@ const colors = {
   npc: "#d9a066"
 };
 
-// === World ===
-let tree = randomTree();
-let storage = { x: 1, y: 6, stored: 0 };
+function randomCoords(x, y, gridWidth, gridHeight) {
+  return {
+    x: (typeof x === "number") ? x : Math.floor(Math.random() * gridWidth),
+    y: (typeof y === "number") ? y : Math.floor(Math.random() * gridHeight)
+  };
+}
 
 //CLASSES
 class Resource {
   constructor(x, y, type, color) {
-    this.x = x;
-    this.y = y;
+  const coords = randomCoords(x, y, gridWidth, gridHeight);
+    this.x = coords.x;
+    this.y = coords.y;
     this.type = type;
     this.color = color;
     this.alive = true;
@@ -39,10 +43,10 @@ class Resource {
 
 class NPC {
   constructor(type, x, y) {
+    const coords = randomCoords(x, y, gridWidth, gridHeight);
+    this.x = coords.x;
+    this.y = coords.y;
     this.type = type;
-    this.x = (typeof x === "number") ? x : Math.floor(Math.random() * gridWidth);
-    this.y = (typeof y === "number") ? y : Math.floor(Math.random() * gridHeight);
-    
     this.state = "walking";
     this.inventory = 0;
     this.target = findNearestResource(this);
@@ -56,7 +60,16 @@ class NPC {
     else if (this.y > target.y) this.y -= speed;
   }
 }
-
+class Storage {
+  constructor(x, y, type = "wood", color = "#5c4b3b") {
+    const coords = randomCoords(x, y, gridWidth, gridHeight);
+    this.x = coords.x;
+    this.y = coords.y;
+    this.type = type;
+    this.color = color;
+    this.stored = 0;
+  }
+}
 // === Time ===
 let time = 0;
 
