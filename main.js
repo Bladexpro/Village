@@ -26,6 +26,9 @@ window.storages = [
   new Storage(1, 6, "wood", "#5c4b3b"),   // Lumberyard
   new Storage(6, 2, "stone", "#888888")  // Quarry
 ];
+// Force draw a red square at tile (3, 3)
+ctx.fillStyle = "red";
+ctx.fillRect(3 * TILE_SIZE, 3 * TILE_SIZE, TILE_SIZE, TILE_SIZE);
 
 const npcs = [
   new NPC("wood", 2, 1),   // Lumberjack
