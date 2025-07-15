@@ -28,11 +28,11 @@ class Resource {
     this.x = x;
     this.y = y;
     this.type = type;
-    this.chopped = false;
+    this.alive = true;
   }
 
   draw() {
-    if (!this.chopped) {
+    if (this.alive) {
       drawTile(this.x, this.y, colors.tree);
     }
   }
@@ -67,7 +67,7 @@ class NPC {
 
   findNearestResource() {
     // Just return first unchopped resource for now
-    return this.resources.find(r => !r.chopped);
+    return this.resources.find(r => r.alive);
   }
 
   moveToward(target) {
@@ -95,7 +95,7 @@ class NPC {
 
         this.moveToward(this.target);
 
-        if (this.target instanceof Resource && !this.target.chopped && this.inventory === 0 && this.reached(this.target)) {
+        if (this.target instanceof Resource && this.target.alive && this.inventory === 0 && this.reached(this.target)) {
           this.state = "chopping";
           this.choppingTimer = 2; // seconds
         } else if (this.target === this.storage && this.inventory === 1 && this.reached(this.storage)) {
@@ -106,7 +106,7 @@ class NPC {
       case "chopping":
         this.choppingTimer -= 1 / 60;
         if (this.choppingTimer <= 0) {
-          this.target.chopped = true;
+          this.target.alive = false;
           this.inventory = 1;
           this.target = this.storage;
           this.state = "walking";
