@@ -1,7 +1,3 @@
-import { NPC } from "./classes/NPC.js";
-import { Storage } from "./classes/Storage.js";
-import { drawTile, generateRandomResource } from "./classes/utils.js";
-
 const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
@@ -12,32 +8,102 @@ const TILE_SIZE = 64;
 const GRID_WIDTH = Math.floor(canvas.width / TILE_SIZE);
 const GRID_HEIGHT = Math.floor(canvas.height / TILE_SIZE);
 
+const colors = {
+  ground: "#6c9a3f",
+  tree: "#3b5e2b",
+  storage: "#5c4b3b",
+  npc: "#d9a066"
+};
+
+// === World ===
+let tree = randomTree();
+let storage = { x: 1, y: 6, stored: 0 };
+
+let npc = {
+  x: 1,
+  y: 1,
+  state: "walking",
+  target: { x: tree.x, y: tree.y },
+  inventory: 0,
+  choppingTimer: 0
+};
+
+
+// === Time ===
 let time = 0;
 
-// === Global Game State ===
-window.resources = [
-  generateRandomResource("wood"),
-  generateRandomResource("stone"),
-  generateRandomResource("wood"),
-  generateRandomResource("stone")
-];
-
-window.storages = [
-  new Storage(1, 6, "wood", "#5c4b3b"),   // Lumberyard
-  new Storage(6, 2, "stone", "#888888")  // Quarry
-];
-// Force draw a red square at tile (3, 3)
-ctx.fillStyle = "red";
-ctx.fillRect(3 * TILE_SIZE, 3 * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-
-const npcs = [
-  new NPC("wood", 2, 1),   // Lumberjack
-  new NPC("stone", 4, 4)   // Miner
-];
+// === Functions ===
+function randomTree() {
+  return {
+    x: Math.floor(Math.random() * GRID_WIDTH),
+    y: Math.floor(Math.random() * GRID_HEIGHT),
+    chopped: false
+  };
+}
 
 function update() {
-  npcs.forEach(npc => npc.update(window.resources));
+  if (npc.state === "walking") {
+    moveToward(npc, npc.target);
+
+    if (reached(npc, tree) && !tree.chopped && npc.inventory === 0) {
+      npc.state = "chopping";
+      drawText("🪓",     npc.x * TILE_SIZE + TILE_SIZE / 4,
+    npc.y * TILE_SIZE - 8);
+      npc.choppingTimer = 2; // seconds
+    }
+
+    if (reached(npc, storage) && npc.inventory === 1) {
+      npc.state = "storing";
+    }
+
+  } else if (npc.state === "chopping") {
+    npc.choppingTimer -= 1 / 60; // approx. 60 FPS
+
+    if (npc.choppingTimer <= 0) {
+      tree.chopped = true;
+      npc.inventory = 1;
+      npc.state = "carrying";
+      npc.target = { x: storage.x, y: storage.y };
+    }
+
+  } else if (npc.state === "carrying") {
+    npc.state = "walking";
+
+  } else if (npc.state === "storing") {
+    npc.inventory = 0;
+    storage.stored += 1;
+
+    // Spawn a new tree
+    tree = randomTree();
+    npc.target = { x: tree.x, y: tree.y };
+    npc.state = "walking";
+  }
+
   time += 0.01;
+}
+
+
+function moveToward(entity, target) {
+  const speed = 0.02;//const speed = 0.02;
+  if (entity.x < target.x) entity.x += speed;
+  else if (entity.x > target.x) entity.x -= speed;
+  if (entity.y < target.y) entity.y += speed;
+  else if (entity.y > target.y) entity.y -= speed;
+}
+
+function reached(a, b) {
+  return Math.abs(a.x - b.x) < 0.05 && Math.abs(a.y - b.y) < 0.05;
+}
+
+function drawTile(x, y, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+}
+
+function drawText(text, x, y) {
+  ctx.fillStyle = "white";
+  ctx.font = "20px Arial";
+  ctx.fillText(text, x, y);
 }
 
 function draw() {
@@ -46,21 +112,21 @@ function draw() {
   const brightness = Math.floor(100 + 100 * Math.sin(time));
   document.body.style.background = `rgb(${brightness}, ${brightness}, ${brightness})`;
 
-  // Ground
   for (let x = 0; x < GRID_WIDTH; x++) {
     for (let y = 0; y < GRID_HEIGHT; y++) {
-      drawTile(ctx, x, y, "#6c9a3f");
+      drawTile(x, y, colors.ground);
     }
   }
 
-  // Resources
-  window.resources.forEach(res => res.draw());
+  if (!tree.chopped) drawTile(tree.x, tree.y, colors.tree);
 
-  // Storages
-  window.storages.forEach(s => s.draw());
+  drawTile(storage.x, storage.y, colors.storage);
+  drawText("Logs: " + storage.stored, storage.x * TILE_SIZE, storage.y * TILE_SIZE - 10);
 
-  // NPCs
-  npcs.forEach(npc => npc.draw());
+  drawTile(npc.x, npc.y, colors.npc);
+  if (npc.inventory > 0) {
+    drawText("🪵", npc.x * TILE_SIZE + 16, npc.y * TILE_SIZE + 40);
+  }
 }
 
 function loop() {
