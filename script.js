@@ -12,7 +12,8 @@ const colors = {
   ground: "#6c9a3f",
   tree: "#3b5e2b",
   storage: "#5c4b3b",
-  npc: "#d9a066"
+  npc: "#d9a066",
+  house: "#8b4513"
 };
 
 function randomCoords() {
@@ -22,6 +23,34 @@ function randomCoords() {
   };
 }
 
+function drawTile(x, y, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+  ctx.strokeStyle = "#00000044";
+  ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+}
+
+function drawText(text, x, y) {
+  ctx.fillStyle = "white";
+  ctx.font = "16px Arial";
+  ctx.fillText(text, x, y);
+}
+
+function drawTriangle(x, y, color) {
+  const centerX = x * TILE_SIZE + TILE_SIZE / 2;
+  const centerY = y * TILE_SIZE + TILE_SIZE / 2;
+  const size = TILE_SIZE / 2;
+
+  ctx.fillStyle = color;
+  ctx.beginPath();
+  ctx.moveTo(centerX, centerY - size / 2); // Top point
+  ctx.lineTo(centerX - size / 2, centerY + size / 2); // Bottom left
+  ctx.lineTo(centerX + size / 2, centerY + size / 2); // Bottom right
+  ctx.closePath();
+  ctx.fill();
+}
+
+
 class Resource {
   constructor(type = "wood") {
     const {x, y} = randomCoords();
@@ -29,6 +58,7 @@ class Resource {
     this.y = y;
     this.type = type;
     this.alive = true;
+    this.targeted = false;
   }
 
   draw() {
@@ -43,6 +73,7 @@ class Storage {
     const {x, y} = randomCoords();
     this.x = x;
     this.y = y;
+    this.type = type;
     this.stored = 0;
   }
 
@@ -52,37 +83,62 @@ class Storage {
   }
 }
 
+class House {
+  constructor() {
+    const {x, y} = randomCoords();
+    this.x = x;
+    this.y = y;
+    this.type = type;
+  }
+
+  draw() {
+    drawTile(this.x, this.y, colors.storage);
+    drawText("House", this.x * TILE_SIZE + 5, this.y * TILE_SIZE + TILE_SIZE / 2);
+    drawTriangle(storage.x, storage.y, "yellow");
+
+  }
+}
+
+
+
 class NPC {
-  constructor(storage, resources) {
-    // Start NPC near storage
-    this.x = storage.x;
-    this.y = storage.y;
+  constructor(resources) {
+    const {x, y} = randomCoords();
+    this.x = x;
+    this.y = y;
     this.state = "walking";
     this.inventory = 0;
     this.choppingTimer = 0;
     this.storage = storage;
     this.resources = resources;
-    this.target = this.findNearestResource();
+    this.setTargetResource();
   }
 
-  findNearestResource() {
-    // Just return first unchopped resource for now
-    return this.resources.find(r => r.alive);
+  setTargetResource() {
+    const target = this.resources.find(r => r.alive && !r.targeted);
+    if (target) {
+      this.target = target;
+      target.targeted = true;
+      this.state = "walking";
+    } else {
+      this.target = null;
+      this.state = "idle";
+    }
   }
 
   moveToward(target) {
     const speed = 0.02;
-    if (this.x < target.x) this.x += speed;
-    else if (this.x > target.x) this.x -= speed;
-    if (this.y < target.y) this.y += speed;
-    else if (this.y > target.y) this.y -= speed;
+    if (this.x < target.x) this.x = Math.min(this.x + speed, target.x);
+    else if (this.x > target.x) this.x = Math.max(this.x - speed, target.x);
+    if (this.y < target.y) this.y = Math.min(this.y + speed, target.y);
+    else if (this.y > target.y) this.y = Math.max(this.y - speed, target.y);
   }
 
   reached(target) {
     return Math.abs(this.x - target.x) < 0.05 && Math.abs(this.y - target.y) < 0.05;
   }
 
-  update() {
+  update() {2222
     switch(this.state) {
       case "walking":
         if (!this.target) {

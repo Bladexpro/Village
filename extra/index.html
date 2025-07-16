@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>NPC Resource Gathering</title>
+<style>
+  body, html {
+    margin: 0; padding: 0; overflow: hidden;
+    background: #444;
+    font-family: sans-serif;
+  }
+  canvas {
+    display: block;
+    background: #6c9a3f;
+  }
+</style>
+</head>
+<body>
+<canvas id="gameCanvas"></canvas>
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+const TILE_SIZE = 4;
+const GRID_WIDTH = Math.floor(canvas.width / TILE_SIZE);
+const GRID_HEIGHT = Math.floor(canvas.height / TILE_SIZE);
+
+const colors = {
+  ground: "#6c9a3f",
+  tree: "#3b5e2b",
+  storage: "#5c4b3b",
+  npc: "#d9a066",
+  house: "#8b4513"
+};
+
+function randomCoords() {
+  return {
+    x: Math.floor(Math.random() * GRID_WIDTH),
+    y: Math.floor(Math.random() * GRID_HEIGHT)
+  };
+}
+
+function drawTile(x, y, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+  ctx.strokeStyle = "#00000044";
+  ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+}
+
+function drawText(text, x, y) {
+  ctx.fillStyle = "white";
+  ctx.font = "16px Arial";
+  ctx.fillText(text, x, y);
+}
+
+class Resource {
+  constructor() {
+    const { x, y } = randomCoords();
+    this.x = x;
+    this.y = y;
+    this.alive = true;
+    this.targeted = false;
+  }
+
+  draw() {
+    if (this.alive) {
+      drawTile(this.x, this.y, colors.tree);
+    }
+  }
+}
+
+class Storage {
+  constructor() {
+    const { x, y } = randomCoords();
+    this.x = x;
+    this.y = y;
+    this.stored = 0;
+  }
+
+  draw() {
+    drawTile(this.x, this.y, colors.storage);
+    drawText(`Logs: ${this.stored}`, this.x * TILE_SIZE + 5, this.y * TILE_SIZE + TILE_SIZE / 2);
+  }
+}
+
+class House {
+  constructor() {
+    const { x, y } = randomCoords();
+    this.x = x;
+    this.y = y;
+  }
+
+  draw() {
+    drawTile(this.x, this.y, colors.house);
+    drawText("House", this.x * TILE_SIZE + 5, this.y * TILE_SIZE + TILE_SIZE / 2);
+  }
+}
+
+class NPC {
+  constructor(resources, storage, house) {
+    const { x, y } = randomCoords();
+    this.x = x;
+    this.y = y;
+    this.state = "walking"; // walking, working, walking_to_storage, depositing, sleeping, idle
+    this.inventory = 0;
+    this.choppingTimer = 0;
+    this.sleepTimer = 0;
+    this.depositTimer = 0;
+    this.resources = resources;
+    this.storage = storage;
+    this.house = house;
+    this.target = null;
+    this.setTargetResource();
+  }
+
+  setTargetResource() {
+    const target = this.resources.find(r => r.alive && !r.targeted);
+    if (target) {
+      this.target = target;
+      target.targeted = true;
+      this.state = "walking";
+    } else {
+      this.target = null;
+      this.state = "idle";
+    }
+  }
+
+  moveToward(target) {
+    const speed = 0.02;
+    if (this.x < target.x) this.x = Math.min(this.x + speed, target.x);
+    else if (this.x > target.x) this.x = Math.max(this.x - speed, target.x);
+    if (this.y < target.y) this.y = Math.min(this.y + speed, target.y);
+    else if (this.y > target.y) this.y = Math.max(this.y - speed, target.y);
+  }
+
+  reached(target) {
+    return Math.abs(this.x - target.x) < 0.05 && Math.abs(this.y - target.y) < 0.05;
+  }
+
+  update(deltaTime) {
+    switch (this.state) {
+      case "walking":
+        if (!this.target) {
+          this.setTargetResource();
+          if (!this.target) {
+            this.state = "idle";
+            return;
+          }
+        }
+        this.moveToward(this.target);
+        if (this.reached(this.target)) {
+          if (this.target.alive) {
+            this.state = "working";
+            this.choppingTimer = 0;
+          } else {
+            this.target.targeted = false;
+            this.target = null;
+          }
+        }
+        break;
+
+      case "working":
+        this.choppingTimer += deltaTime;
+        if (this.choppingTimer > 3000) { // 3 seconds chopping
+          this.target.alive = false;
+          this.target.targeted = false;
+          this.inventory += 1;
+          this.target = null;
+          this.choppingTimer = 0;
+          if (this.inventory >= 10) {
+            this.state = "idle";
+          } else {
+            this.target = { x: this.storage.x, y: this.storage.y };
+            this.state = "walking_to_storage";
+          }
+        }
+        break;
+
+      case "walking_to_storage":
+        this.moveToward(this.target);
+        if (this.reached(this.target)) {
+          this.state = "depositing";
+          this.depositTimer = 0;
+        }
+        break;
+
+      case "depositing":
+        this.depositTimer += deltaTime;
+        if (this.depositTimer > 1000) { // 1 second to deposit
+          if (this.inventory > 0) {
+            this.inventory -= 1;
+            this.storage.stored += 1;
+          }
+          this.depositTimer = 0;
+          if (this.inventory === 0) {
+            this.setTargetResource();
+          } else if (this.inventory >= 10) {
+            this.state = "idle";
+          } else {
+            this.state = "walking_to_storage";
+          }
+        }
+        break;
+
+      case "sleeping":
+        this.moveToward(this.house);
+        if (this.reached(this.house)) {
+          this.sleepTimer += deltaTime;
+          if (this.sleepTimer > 5000) { // sleep 5 seconds
+            this.sleepTimer = 0;
+            this.state = "walking";
+            this.setTargetResource();
+          }
+        }
+        break;
+
+      case "idle":
+        if (this.inventory >= 10) {
+          this.target = this.house;
+          this.state = "sleeping";
+        } else {
+          this.setTargetResource();
+          if (this.state === "idle") {
+            // no resources available, do nothing
+          }
+        }
+        break;
+    }
+  }
+
+  draw() {
+    drawTile(Math.floor(this.x), Math.floor(this.y), colors.npc);
+    drawText(`Inv: ${this.inventory}`, this.x * TILE_SIZE, this.y * TILE_SIZE - 10);
+  }
+}
+
+// Setup
+
+const resources = [];
+for (let i = 0; i < 20; i++) {
+  resources.push(new Resource());
+}
+
+const storage = new Storage();
+const house = new House();
+const npc = new NPC(resources, storage, house);
+
+let lastTime = performance.now();
+
+function gameLoop(time) {
+  const deltaTime = time - lastTime;
+  lastTime = time;
+
+  // Clear canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw ground tiles grid
+  for (let x = 0; x < GRID_WIDTH; x++) {
+    for (let y = 0; y < GRID_HEIGHT; y++) {
+      drawTile(x, y, colors.ground);
+    }
+  }
+
+  // Draw all resources
+  resources.forEach(r => r.draw());
+
+  // Draw storage and house
+  storage.draw();
+  house.draw();
+
+  // Update and draw NPC
+  npc.update(deltaTime);
+  npc.draw();
+
+  requestAnimationFrame(gameLoop);
+}
+
+requestAnimationFrame(gameLoop);
+</script>
+</body>
+</html>
