@@ -176,64 +176,142 @@ class NPC {
         this.state = "walking";
         break;
     }
+  }update(deltaTime) {
+    switch (this.state) {
+      case "walking":
+        if (!this.target) {
+          this.setTargetResource();
+          if (!this.target) {
+            this.state = "idle";
+            return;
+          }
+        }
+        this.moveToward(this.target);
+        if (this.reached(this.target)) {
+          if (this.target.alive) {
+            this.state = "working";
+            this.choppingTimer = 0;
+          } else {
+            this.target.targeted = false;
+            this.target = null;
+          }
+        }
+        break;
+
+      case "working":
+        this.choppingTimer += deltaTime;
+        if (this.choppingTimer > 3000) { // 3 seconds chopping
+          this.target.alive = false;
+          this.target.targeted = false;
+          this.inventory += 1;
+          this.target = null;
+          this.choppingTimer = 0;
+          if (this.inventory >= 10) {
+            this.state = "idle";
+          } else {
+            this.target = { x: this.storage.x, y: this.storage.y };
+            this.state = "walking_to_storage";
+          }
+        }
+        break;
+
+      case "walking_to_storage":
+        this.moveToward(this.target);
+        if (this.reached(this.target)) {
+          this.state = "depositing";
+          this.depositTimer = 0;
+        }
+        break;
+
+      case "depositing":
+        this.depositTimer += deltaTime;
+        if (this.depositTimer > 1000) { // 1 second to deposit
+          if (this.inventory > 0) {
+            this.inventory -= 1;
+            this.storage.stored += 1;
+          }
+          this.depositTimer = 0;
+          if (this.inventory === 0) {
+            this.setTargetResource();
+          } else if (this.inventory >= 10) {
+            this.state = "idle";
+          } else {
+            this.state = "walking_to_storage";
+          }
+        }
+        break;
+
+      case "sleeping":
+        this.moveToward(this.house);
+        if (this.reached(this.house)) {
+          this.sleepTimer += deltaTime;
+          if (this.sleepTimer > 5000) { // sleep 5 seconds
+            this.sleepTimer = 0;
+            this.state = "walking";
+            this.setTargetResource();
+          }
+        }
+        break;
+
+      case "idle":
+        if (this.inventory >= 10) {
+          this.target = this.house;
+          this.state = "sleeping";
+        } else {
+          this.setTargetResource();
+          if (this.state === "idle") {
+            // no resources available, do nothing
+          }
+        }
+        break;
+    }
   }
 
   draw() {
     drawTile(Math.floor(this.x), Math.floor(this.y), colors.npc);
-    if (this.inventory > 0) {
-      drawText("🪵", Math.floor(this.x) * TILE_SIZE + 16, Math.floor(this.y) * TILE_SIZE + 40);
-    }
-    if (this.state === "chopping") {
-      drawText("🪓", Math.floor(this.x) * TILE_SIZE + TILE_SIZE / 4, Math.floor(this.y) * TILE_SIZE - 8);
-    }
+    drawText(`Inv: ${this.inventory}`, this.x * TILE_SIZE, this.y * TILE_SIZE - 10);
   }
 }
 
-// Drawing helpers
-function drawTile(x, y, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-}
-
-function drawText(text, x, y) {
-  ctx.fillStyle = "white";
-  ctx.font = "20px Arial";
-  ctx.fillText(text, x, y);
-}
-
 // Setup
-const resources = [new Resource()];
-const storage = new Storage();
-const npc = new NPC(storage, resources);
 
-let time = 0;
-
-function update() {
-  npc.update();
-  time += 0.01;
+const resources = [];
+for (let i = 0; i < 20; i++) {
+  resources.push(new Resource());
 }
 
-function draw() {
+const storage = new Storage();
+const house = new House();
+const npc = new NPC(resources, storage, house);
+
+let lastTime = performance.now();
+
+function gameLoop(time) {
+  const deltaTime = time - lastTime;
+  lastTime = time;
+
+  // Clear canvas
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  const brightness = Math.floor(100 + 100 * Math.sin(time));
-  document.body.style.background = `rgb(${brightness}, ${brightness}, ${brightness})`;
-
+  // Draw ground tiles grid
   for (let x = 0; x < GRID_WIDTH; x++) {
     for (let y = 0; y < GRID_HEIGHT; y++) {
       drawTile(x, y, colors.ground);
     }
   }
 
+  // Draw all resources
   resources.forEach(r => r.draw());
+
+  // Draw storage and house
   storage.draw();
+  house.draw();
+
+  // Update and draw NPC
+  npc.update(deltaTime);
   npc.draw();
+
+  requestAnimationFrame(gameLoop);
 }
 
-function loop() {
-  update();
-  draw();
-  requestAnimationFrame(loop);
-}
-
-loop();
+requestAnimationFrame(gameLoop);
