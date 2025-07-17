@@ -1,55 +1,48 @@
 const canvas = document.getElementById('gameCanvas');
-const ctx = canvas.getContext('2d');
+const context = canvas.getContext('2d');
 
 canvas.width = window.innerWidth;
 canvas.height = window.innerHeight;
 
-const TILE_SIZE = 64;
-const GRID_WIDTH = Math.floor(canvas.width / TILE_SIZE);
-const GRID_HEIGHT = Math.floor(canvas.height / TILE_SIZE);
+const dimensions = {
+    width: canvas.width,
+    height: canvas.height,
+    speed: 10,
+    resource: 45,
+    house: 150,
+    storage: 70,
+    npc: 80
+}
 
 const colors = {
-  ground: "#6c9a3f",
-  tree: "#3b5e2b",
-  storage: "#5c4b3b",
-  npc: "#d9a066",
-  house: "#8b4513"
+    ground: "#6c9a3f",
+    tree: "#3b5e2b",
+    storage: "#5c4b3b",
+    npc: "#d9a066",
+    house: "#8b4513"
 };
 
 function randomCoords() {
   return {
-    x: Math.floor(Math.random() * GRID_WIDTH),
-    y: Math.floor(Math.random() * GRID_HEIGHT)
+    x: Math.random() * dimensions.width,
+    y: Math.random() * dimensions.height
   };
 }
 
-function drawTile(x, y, color) {
-  ctx.fillStyle = color;
-  ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-  ctx.strokeStyle = "#00000044";
-  ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+function drawSquare(x, y, size, color) {
+  //Base form
+  context.fillStyle = color;
+  context.fillRect(x, y, size, size);
+  //Outline
+  context.strokeStyle = "#00000044";
+  context.strokeRect(x, y, size, size);
 }
 
-function drawText(text, x, y) {
-  ctx.fillStyle = "white";
-  ctx.font = "16px Arial";
-  ctx.fillText(text, x, y);
+function drawText(x, y, text) {
+  context.fillStyle = "white";
+  context.font = "16px Arial";
+  context.fillText(text, x, y);
 }
-
-function drawTriangle(x, y, color) {
-  const centerX = x * TILE_SIZE + TILE_SIZE / 2;
-  const centerY = y * TILE_SIZE + TILE_SIZE / 2;
-  const size = TILE_SIZE / 2;
-
-  ctx.fillStyle = color;
-  ctx.beginPath();
-  ctx.moveTo(centerX, centerY - size / 2); // Top point
-  ctx.lineTo(centerX - size / 2, centerY + size / 2); // Bottom left
-  ctx.lineTo(centerX + size / 2, centerY + size / 2); // Bottom right
-  ctx.closePath();
-  ctx.fill();
-}
-
 
 class Resource {
   constructor(type = "wood") {
@@ -63,13 +56,13 @@ class Resource {
 
   draw() {
     if (this.alive) {
-      drawTile(this.x, this.y, colors.tree);
+      drawSquare(this.x, this.y, dimensions.resource, colors.tree);
     }
   }
 }
 
 class Storage {
-  constructor() {
+  constructor(type = "wood") {
     const {x, y} = randomCoords();
     this.x = x;
     this.y = y;
@@ -78,13 +71,13 @@ class Storage {
   }
 
   draw() {
-    drawTile(this.x, this.y, colors.storage);
-    drawText(`Logs: ${this.stored}`, this.x * TILE_SIZE, this.y * TILE_SIZE - 10);
+    drawSquare(this.x, this.y, dimensions.storage, colors.storage);
+    drawText(this.x, this.y - 10,`Logs: ${this.stored}`);
   }
 }
 
 class House {
-  constructor() {
+  constructor(type = "wood") {
     const {x, y} = randomCoords();
     this.x = x;
     this.y = y;
@@ -92,226 +85,114 @@ class House {
   }
 
   draw() {
-    drawTile(this.x, this.y, colors.storage);
-    drawText("House", this.x * TILE_SIZE + 5, this.y * TILE_SIZE + TILE_SIZE / 2);
-    drawTriangle(storage.x, storage.y, "yellow");
+    drawSquare(this.x, this.y, dimensions.house, colors.storage);
+    drawText(this.x + 5, this.y + dimensions.house / 2, "House");
 
   }
 }
 
-
-
-class NPC {
-  constructor(resources) {
+class Npc {
+  constructor(type = "wood", name) {
     const {x, y} = randomCoords();
     this.x = x;
     this.y = y;
     this.state = "walking";
     this.inventory = 0;
-    this.choppingTimer = 0;
-    this.storage = storage;
-    this.resources = resources;
-    this.setTargetResource();
+    this.workingTime = 2; //in seconds or miliseconds
+    this.type = type;
+    this.name = name;
   }
 
-  setTargetResource() {
-    const target = this.resources.find(r => r.alive && !r.targeted);
-    if (target) {
-      this.target = target;
-      target.targeted = true;
-      this.state = "walking";
-    } else {
-      this.target = null;
-      this.state = "idle";
+  draw() {  
+    context.drawImage(man, this.x, this.y, dimensions.npc, dimensions.npc)
+    drawText(this.x, this.y - 10, this.name);
+  }
+
+    moveTo(x,y){
+        if (this.x < x) 
+            this.x = Math.min(this.x + dimensions.speed, x);
+        else if (this.x > x) 
+            this.x = Math.max(this.x - dimensions.speed, x);
+        if (this.y < y)
+            this.y = Math.min(this.y + dimensions.speed, y);
+        else if (this.y > y)
+            this.y = Math.max(this.y - dimensions.speed, y);
+    }
+}
+
+const man = new Image();
+
+const resources = [//Resource("type","name")
+  new Resource("wood","tree"),
+  new Resource("stone","stone"),
+  new Resource("food","berry")
+];
+
+const npcs = [//Npc("type","name")
+  lumberjack = new Npc("wood","lumberjack"),
+  new Npc("stone","miner"),
+  new Npc("food","farmer")
+];
+
+const storages = [//Storage("type")
+  new Storage("wood"),
+  new Storage("stone"),
+  new Storage("food")
+];
+
+const houses = [//Storage("type")
+  new House("wood"),
+  new House("stone"),
+  new House("food")
+];
+
+function update(){
+for (let i = 0; i < npcs.length; i++) {
+    const npc = npcs[i];
+
+    // Find the first resource that matches the npc's type and is alive
+    const targetResource = resources.find(r => r.type === npc.type && r.alive);
+
+    // Move the npc toward the resource if found
+    if (targetResource) {
+      npc.moveTo(targetResource.x, targetResource.y);
     }
   }
 
-  moveToward(target) {
-    const speed = 0.02;
-    if (this.x < target.x) this.x = Math.min(this.x + speed, target.x);
-    else if (this.x > target.x) this.x = Math.max(this.x - speed, target.x);
-    if (this.y < target.y) this.y = Math.min(this.y + speed, target.y);
-    else if (this.y > target.y) this.y = Math.max(this.y - speed, target.y);
-  }
-
-  reached(target) {
-    return Math.abs(this.x - target.x) < 0.05 && Math.abs(this.y - target.y) < 0.05;
-  }
-
-  update() {2222
-    switch(this.state) {
-      case "walking":
-        if (!this.target) {
-          this.target = this.findNearestResource();
-          if (!this.target) {
-            // No resource left, do nothing
-            return;
-          }
-        }
-
-        this.moveToward(this.target);
-
-        if (this.target instanceof Resource && this.target.alive && this.inventory === 0 && this.reached(this.target)) {
-          this.state = "chopping";
-          this.choppingTimer = 2; // seconds
-        } else if (this.target === this.storage && this.inventory === 1 && this.reached(this.storage)) {
-          this.state = "storing";
-        }
-        break;
-
-      case "chopping":
-        this.choppingTimer -= 1 / 60;
-        if (this.choppingTimer <= 0) {
-          this.target.alive = false;
-          this.inventory = 1;
-          this.target = this.storage;
-          this.state = "walking";
-        }
-        break;
-
-      case "storing":
-        this.inventory = 0;
-        this.storage.stored += 1;
-        this.target = this.findNearestResource();
-        this.state = "walking";
-        break;
-    }
-  }update(deltaTime) {
-    switch (this.state) {
-      case "walking":
-        if (!this.target) {
-          this.setTargetResource();
-          if (!this.target) {
-            this.state = "idle";
-            return;
-          }
-        }
-        this.moveToward(this.target);
-        if (this.reached(this.target)) {
-          if (this.target.alive) {
-            this.state = "working";
-            this.choppingTimer = 0;
-          } else {
-            this.target.targeted = false;
-            this.target = null;
-          }
-        }
-        break;
-
-      case "working":
-        this.choppingTimer += deltaTime;
-        if (this.choppingTimer > 3000) { // 3 seconds chopping
-          this.target.alive = false;
-          this.target.targeted = false;
-          this.inventory += 1;
-          this.target = null;
-          this.choppingTimer = 0;
-          if (this.inventory >= 10) {
-            this.state = "idle";
-          } else {
-            this.target = { x: this.storage.x, y: this.storage.y };
-            this.state = "walking_to_storage";
-          }
-        }
-        break;
-
-      case "walking_to_storage":
-        this.moveToward(this.target);
-        if (this.reached(this.target)) {
-          this.state = "depositing";
-          this.depositTimer = 0;
-        }
-        break;
-
-      case "depositing":
-        this.depositTimer += deltaTime;
-        if (this.depositTimer > 1000) { // 1 second to deposit
-          if (this.inventory > 0) {
-            this.inventory -= 1;
-            this.storage.stored += 1;
-          }
-          this.depositTimer = 0;
-          if (this.inventory === 0) {
-            this.setTargetResource();
-          } else if (this.inventory >= 10) {
-            this.state = "idle";
-          } else {
-            this.state = "walking_to_storage";
-          }
-        }
-        break;
-
-      case "sleeping":
-        this.moveToward(this.house);
-        if (this.reached(this.house)) {
-          this.sleepTimer += deltaTime;
-          if (this.sleepTimer > 5000) { // sleep 5 seconds
-            this.sleepTimer = 0;
-            this.state = "walking";
-            this.setTargetResource();
-          }
-        }
-        break;
-
-      case "idle":
-        if (this.inventory >= 10) {
-          this.target = this.house;
-          this.state = "sleeping";
-        } else {
-          this.setTargetResource();
-          if (this.state === "idle") {
-            // no resources available, do nothing
-          }
-        }
-        break;
-    }
-  }
-
-  draw() {
-    drawTile(Math.floor(this.x), Math.floor(this.y), colors.npc);
-    drawText(`Inv: ${this.inventory}`, this.x * TILE_SIZE, this.y * TILE_SIZE - 10);
+  // Example: move lumberjack specifically to the wood house
+  const woodhouse = houses.find(h => h.type === "wood");
+  if (woodhouse) {
+    lumberjack.moveTo(woodhouse.x, woodhouse.y);
   }
 }
 
-// Setup
-
-const resources = [];
-for (let i = 0; i < 20; i++) {
-  resources.push(new Resource());
-}
-
-const storage = new Storage();
-const house = new House();
-const npc = new NPC(resources, storage, house);
-
-let lastTime = performance.now();
-
-function gameLoop(time) {
-  const deltaTime = time - lastTime;
-  lastTime = time;
-
-  // Clear canvas
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-  // Draw ground tiles grid
-  for (let x = 0; x < GRID_WIDTH; x++) {
-    for (let y = 0; y < GRID_HEIGHT; y++) {
-      drawTile(x, y, colors.ground);
+function draw(){
+    for (let i = 0; i < resources.length; i++) {
+    resources[i].draw();
     }
-  }
-
-  // Draw all resources
-  resources.forEach(r => r.draw());
-
-  // Draw storage and house
-  storage.draw();
-  house.draw();
-
-  // Update and draw NPC
-  npc.update(deltaTime);
-  npc.draw();
-
-  requestAnimationFrame(gameLoop);
+    for (let i = 0; i < npcs.length; i++) {
+    npcs[i].draw();
+    }
+    for (let i = 0; i < storages.length; i++) {
+    storages[i].draw();
+    }
+    for (let i = 0; i < houses.length; i++) {
+    houses[i].draw();
+    }
 }
 
-requestAnimationFrame(gameLoop);
+function init() {
+    man.src = "pixel_art_man.png";
+    window.requestAnimationFrame(newframe);
+}
+
+
+function newframe() {
+    context.clearRect(0, 0, canvas.width, canvas.height); // clear before redraw
+    update()   
+    draw()
+    window.requestAnimationFrame(newframe);
+}
+
+
+init()
